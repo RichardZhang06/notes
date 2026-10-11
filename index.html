@@ -100,13 +100,14 @@
   }
   #status #mode { color: var(--fg); font-weight: bold; min-width: 12ch; }
   #status .sp { flex: 1; }
+  #status button { padding: 0 6px; font-size: 12px; color: var(--muted); }
 
   /* CodeMirror */
   .cm-editor { background: var(--bg); color: var(--fg); font-size: 14px; }
   .cm-editor.cm-focused { outline: none; }
   .cm-scroller { font-family: inherit; line-height: 1.6; padding: 8px 0; }
   .cm-content { padding: 0 20px; caret-color: var(--fg); }
-  .cm-cursor { border-left-color: var(--fg); }
+  .cm-editor .cm-cursor, .cm-editor .cm-dropCursor { border-left: 2px solid var(--fg); }
   .cm-fat-cursor { background: var(--accent) !important; color: var(--bg) !important; }
   .cm-editor:not(.cm-focused) .cm-fat-cursor { background: none !important; outline: 1px solid var(--accent); }
   .cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: var(--sel) !important; }
@@ -153,10 +154,11 @@
   </div>
   <div id="status">
     <span id="mode">-- NORMAL --</span>
+    <button id="vim" class="linkish">vim: on</button>
     <span id="saved"></span>
     <span class="sp"></span>
     <span id="count"></span>
-    <span class="hide-narrow">Alt+N new · Alt+P preview · Alt+B sidebar · :w save</span>
+    <span class="hide-narrow">Alt+N new · Alt+P preview · Alt+B sidebar · Alt+V vim · :w save</span>
   </div>
 </div>
 <input id="linkbox" type="text" readonly hidden aria-label="Share link">
@@ -180,7 +182,7 @@
 } }
 </script>
 <script type="module">
-const [{ EditorState }, { EditorView, keymap, drawSelection }, { defaultKeymap, history, historyKeymap },
+const [{ EditorState, Compartment }, { EditorView, keymap, drawSelection }, { defaultKeymap, history, historyKeymap },
        { markdown }, { HighlightStyle, syntaxHighlighting }, { tags: t }, { vim, Vim, getCM },
        { default: MarkdownIt }, { default: katex }, { default: LZ }] = await Promise.all([
   import("@codemirror/state"),
@@ -255,12 +257,15 @@ const hl = HighlightStyle.define([
   { tag: [t.monospace, t.processingInstruction, t.meta], color: "var(--muted)" },
 ]);
 let applying = false;
+const VIM_KEY = "notes.vim";
+const vimConf = new Compartment();
+let vimOn = store.get(VIM_KEY) !== "off";
 const view = new EditorView({
   parent: $("editor"),
   state: EditorState.create({
     doc: cur().content,
     extensions: [
-      vim(),
+      vimConf.of(vimOn ? vim() : []),
       history(), drawSelection(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       markdown(), syntaxHighlighting(hl),
@@ -283,12 +288,25 @@ function updateCount() {
 // Vim: :w saves, mode indicator
 Vim.defineEx("write", "w", () => { flushSave(); toast("saved"); });
 Vim.defineEx("wq", "wq", () => { flushSave(); toast("saved"); });
-const cm = getCM(view);
-cm.on("vim-mode-change", (e) => {
-  const sub = e.subMode ? ({ linewise: "V-LINE", blockwise: "V-BLOCK" })[e.subMode] : null;
-  const name = e.mode === "visual" ? sub || "VISUAL" : e.mode.toUpperCase();
-  $("mode").textContent = `-- ${name} --`;
-});
+function bindVim() {
+  const cm = getCM(view);
+  if (!cm) return;
+  cm.on("vim-mode-change", (e) => {
+    const sub = e.subMode ? ({ linewise: "V-LINE", blockwise: "V-BLOCK" })[e.subMode] : null;
+    const name = e.mode === "visual" ? sub || "VISUAL" : e.mode.toUpperCase();
+    $("mode").textContent = `-- ${name} --`;
+  });
+}
+function setVim(on) {
+  vimOn = on;
+  view.dispatch({ effects: vimConf.reconfigure(on ? vim() : []) });
+  store.set(VIM_KEY, on ? "on" : "off");
+  $("vim").textContent = on ? "vim: on" : "vim: off";
+  $("vim").title = "Turn Vim keybindings " + (on ? "off" : "on") + " (Alt+V)";
+  $("mode").textContent = on ? "-- NORMAL --" : "";
+  if (on) bindVim();
+  view.focus();
+}
 
 /* ---------- note list ---------- */
 let pendingDelete = null, pendingTimer;
@@ -434,10 +452,14 @@ addEventListener("keydown", (e) => {
   if (e.code === "KeyN") { e.preventDefault(); newNote(); }
   else if (e.code === "KeyP") { e.preventDefault(); $("toggle").click(); }
   else if (e.code === "KeyB") { e.preventDefault(); toggleSidebar(); }
+  else if (e.code === "KeyV") { e.preventDefault(); setVim(!vimOn); }
 }, true);
 addEventListener("beforeunload", flushSave);
 addEventListener("hashchange", loadFromHash);
 
+$("vim").onclick = () => setVim(!vimOn);
+bindVim();
+if (!vimOn) { $("vim").textContent = "vim: off"; $("vim").title = "Turn Vim keybindings on (Alt+V)"; $("mode").textContent = ""; }
 renderList(); updatePreview(); updateCount();
 $("saved").textContent = "";
 loadFromHash();

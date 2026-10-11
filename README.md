@@ -4,7 +4,7 @@ A minimal, distraction-free note-taking web app in the spirit of [blank.page](ht
 
 ## Features
 
-- **Vim editing**: normal, insert and visual modes; `:w` saves. The current mode is shown in the status bar.
+- **Vim editing**: normal, insert and visual modes; `:w` saves. The current mode is shown in the status bar. Vim can be switched off (and back on) with the `vim: on` button in the status bar or `Alt+V`; the choice is remembered.
 - **Markdown + LaTeX**: `$inline$` and `$$display$$` math rendered with KaTeX.
 - **Live preview**: split view on wide screens; on narrow screens, a button toggles between edit and preview.
 - **Multiple notes**: a sidebar to create, rename, delete and switch notes.
@@ -12,4 +12,4 @@ A minimal, distraction-free note-taking web app in the spirit of [blank.page](ht
 - **Export / import / share**: download a note as `.md`, import a `.md` file, or copy a link that contains the note itself.
 - **Theme**: dark or light, following your system setting, with a manual toggle.
 - **Hideable sidebar**: the ☰ button or `Alt+B` hides and shows it; the choice is remembered.
-- **Shortcuts**: `Alt+N` new note, `Alt+P` toggle preview, `Alt+B` toggle sidebar.
+- **Shortcuts**: `Alt+N` new note, `Alt+P` toggle preview, `Alt+B` toggle sidebar, `Alt+V` toggle Vim.
