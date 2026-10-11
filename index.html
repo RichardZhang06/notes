@@ -131,7 +131,7 @@
 </head>
 <body class="preview-on">
 <aside id="sidebar">
-  <header><strong>Notes</strong><button id="new" title="New note (Alt+N)">+ new</button><button id="hide-sidebar" title="Hide sidebar (Alt+B)">« hide</button></header>
+  <header><strong>Notes</strong><button id="new" title="New note (Alt+N)">+ new</button></header>
   <ul id="list"></ul>
   <footer>
     <button id="import" title="Import a .md file">import</button>
@@ -426,7 +426,6 @@ function toggleSidebar() {
   if (innerWidth > 800) store.set(SIDEBAR_KEY, hidden ? "hidden" : "shown");
 }
 $("menu-btn").onclick = toggleSidebar;
-$("hide-sidebar").onclick = toggleSidebar;
 if (innerWidth > 800 && store.get(SIDEBAR_KEY) === "hidden") document.body.classList.add("no-sidebar");
 if (innerWidth <= 800) { document.body.classList.add("no-sidebar"); setPreview(false); }
 
