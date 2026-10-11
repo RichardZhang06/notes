@@ -56,6 +56,8 @@
   #list li:hover .acts, #list li.active .acts { display: flex; }
   #list .acts button { padding: 0 5px; border: none; color: var(--muted); }
   #list .acts button:hover { color: var(--fg); }
+  #list li.arm .acts { display: flex; }
+  #list .acts button.armed { color: #d33; font-weight: bold; }
   #sidebar footer { padding: 8px; border-top: 1px solid var(--border); display: flex; gap: 6px; flex-wrap: wrap; }
   body.no-sidebar #sidebar { display: none; }
 
@@ -65,7 +67,12 @@
     display: flex; align-items: center; gap: 6px; padding: 6px 10px;
     border-bottom: 1px solid var(--border);
   }
-  #bar .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  #bar .title {
+    flex: 1; min-width: 0; font: inherit; color: var(--muted); background: none;
+    border: 1px solid transparent; border-radius: 4px; padding: 2px 6px; text-overflow: ellipsis;
+  }
+  #bar .title:hover { border-color: var(--border); }
+  #bar .title:focus { outline: none; color: var(--fg); border-color: var(--accent); background: var(--bg); }
   #panes { flex: 1; min-height: 0; display: flex; }
   #editor { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
   #editor .cm-editor { height: 100%; }
@@ -109,6 +116,7 @@
   #toast { position: fixed; bottom: 36px; right: 14px; background: var(--fg); color: var(--bg); padding: 6px 12px; border-radius: 4px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #toast.show { opacity: .92; }
   #menu-btn { display: none; }
+  #linkbox { position: fixed; bottom: 64px; right: 14px; width: min(420px, calc(100vw - 28px)); font: inherit; padding: 6px 8px; color: var(--fg); background: var(--bg2); border: 1px solid var(--accent); border-radius: 4px; }
 
   @media (max-width: 800px) {
     #sidebar { position: fixed; z-index: 10; top: 0; bottom: 0; left: 0; box-shadow: 2px 0 10px rgba(0,0,0,.25); }
@@ -134,7 +142,7 @@
 <div id="main">
   <div id="bar">
     <button id="menu-btn" title="Notes list">☰</button>
-    <span class="title" id="title"></span>
+    <input class="title" id="title" type="text" spellcheck="false" aria-label="Note name" title="Click to rename">
     <button id="toggle" title="Toggle preview (Alt+P)">preview</button>
     <button id="export" title="Download as .md">export .md</button>
     <button id="share" title="Copy a link containing this note">copy link</button>
@@ -151,6 +159,7 @@
     <span class="hide-narrow">Alt+N new · Alt+P preview · :w save</span>
   </div>
 </div>
+<input id="linkbox" type="text" readonly hidden aria-label="Share link">
 <div id="toast" role="status"></div>
 
 <script type="importmap">
@@ -282,17 +291,34 @@ cm.on("vim-mode-change", (e) => {
 });
 
 /* ---------- note list ---------- */
+let pendingDelete = null, pendingTimer;
+function armDelete(id) {
+  pendingDelete = id; renderList();
+  clearTimeout(pendingTimer); pendingTimer = setTimeout(disarmDelete, 3000);
+}
+function disarmDelete() {
+  if (pendingDelete === null) return;
+  clearTimeout(pendingTimer); pendingDelete = null; renderList();
+}
+// dismiss the "delete?" prompt: click anywhere else, move the mouse off the row, or press Esc
+document.addEventListener("click", (e) => { if (!e.target.closest("[data-a=delete].armed")) disarmDelete(); }, true);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") disarmDelete(); }, true);
+document.addEventListener("mousemove", (e) => {
+  if (pendingDelete !== null && !e.target.closest("li.arm")) disarmDelete();
+});
 function renderList() {
   const ul = $("list"); ul.textContent = "";
   for (const n of state.notes) {
     const li = document.createElement("li");
     li.className = n.id === state.current ? "active" : "";
     li.dataset.id = n.id;
-    li.innerHTML = `<span class="t"></span><span class="acts"><button data-a="rename" title="Rename">✎</button><button data-a="delete" title="Delete">✕</button></span>`;
+    const arm = pendingDelete === n.id;
+    li.innerHTML = `<span class="t"></span><span class="acts"><button data-a="rename" title="Rename">✎</button><button data-a="delete" class="${arm ? "armed" : ""}" title="${arm ? "Click again to delete" : "Delete"}">${arm ? "delete?" : "✕"}</button></span>`;
+    if (arm) li.classList.add("arm");
     li.querySelector(".t").textContent = n.title;
     ul.append(li);
   }
-  $("title").textContent = cur()?.title ?? "";
+  $("title").value = cur()?.title ?? "";
   document.title = (cur()?.title || "Notes") + " — Notes";
 }
 function switchTo(id) {
@@ -310,12 +336,13 @@ $("list").addEventListener("click", (e) => {
   const li = e.target.closest("li"); if (!li) return;
   const id = li.dataset.id, a = e.target.dataset.a;
   if (a === "rename") {
-    const n = state.notes.find((x) => x.id === id);
-    const name = prompt("Rename note", n.title);
-    if (name && name.trim()) { n.title = name.trim(); n.auto = false; persist(); renderList(); }
+    if (id !== state.current) switchTo(id);
+    if (innerWidth <= 800) document.body.classList.remove("no-sidebar");
+    $("title").focus(); $("title").select();
   } else if (a === "delete") {
     const n = state.notes.find((x) => x.id === id);
-    if (!confirm(`Delete "${n.title}"?`)) return;
+    if (pendingDelete !== id) { armDelete(id); return; }
+    clearTimeout(pendingTimer); pendingDelete = null;
     state.notes = state.notes.filter((x) => x.id !== id);
     if (!state.notes.length) addNote("", "");
     if (state.current === id || !cur()) state.current = state.notes[0].id;
@@ -323,6 +350,23 @@ $("list").addEventListener("click", (e) => {
   } else if (id !== state.current) switchTo(id);
 });
 $("new").onclick = () => newNote();
+
+// inline rename: edit the note name in the top bar
+const titleEl = $("title");
+titleEl.addEventListener("input", () => {
+  const n = cur(); n.title = titleEl.value; n.auto = false;
+  const t = $("list").querySelector("li.active .t"); if (t) t.textContent = n.title || "Untitled";
+  scheduleSave();
+});
+titleEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); titleEl.blur(); view.focus(); }
+});
+titleEl.addEventListener("blur", () => {
+  const n = cur();
+  if (!n.title.trim()) { n.auto = true; n.title = autoTitle(n.content); }
+  else n.title = n.title.trim();
+  renderList(); flushSave();
+});
 
 /* ---------- export / import / share ---------- */
 function toast(msg) {
@@ -349,8 +393,14 @@ $("share").onclick = async () => {
   const n = cur();
   const url = location.href.split("#")[0] + "#n=" + LZ.compressToEncodedURIComponent(JSON.stringify({ t: n.title, c: n.content }));
   try { await navigator.clipboard.writeText(url); toast(`link copied (${url.length} chars)`); }
-  catch { prompt("Copy this link:", url); }
+  catch { showLink(url); }
 };
+function showLink(url) {
+  const box = $("linkbox"); box.value = url; box.hidden = false; box.focus(); box.select();
+  toast("press Ctrl/Cmd+C to copy the link");
+}
+$("linkbox").addEventListener("blur", () => { $("linkbox").hidden = true; });
+$("linkbox").addEventListener("keydown", (e) => { if (e.key === "Escape") $("linkbox").blur(); });
 function loadFromHash() {
   const m = location.hash.match(/^#n=(.+)$/); if (!m) return;
   try {
