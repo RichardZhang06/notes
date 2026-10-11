@@ -11,4 +11,5 @@ A minimal, distraction-free note-taking web app in the spirit of [blank.page](ht
 - **Autosave**: notes are saved to your browser's `localStorage` shortly after you stop typing.
 - **Export / import / share**: download a note as `.md`, import a `.md` file, or copy a link that contains the note itself.
 - **Theme**: dark or light, following your system setting, with a manual toggle.
-- **Shortcuts**: `Alt+N` new note, `Alt+P` toggle preview.
+- **Hideable sidebar**: the ☰ button or `Alt+B` hides and shows it; the choice is remembered.
+- **Shortcuts**: `Alt+N` new note, `Alt+P` toggle preview, `Alt+B` toggle sidebar.

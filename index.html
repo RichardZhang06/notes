@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Notes</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%3E%3Crect%20width=%2264%22%20height=%2264%22%20rx=%2214%22%20fill=%22%232f6fed%22/%3E%3Crect%20x=%2214%22%20y=%2216%22%20width=%2230%22%20height=%225%22%20rx=%222.5%22%20fill=%22%23fff%22/%3E%3Crect%20x=%2214%22%20y=%2229%22%20width=%2236%22%20height=%225%22%20rx=%222.5%22%20fill=%22%23fff%22%20opacity=%22.75%22/%3E%3Crect%20x=%2214%22%20y=%2242%22%20width=%2216%22%20height=%226%22%20rx=%221%22%20fill=%22%23fff%22/%3E%3Crect%20x=%2234%22%20y=%2240%22%20width=%2210%22%20height=%2210%22%20rx=%221%22%20fill=%22%23fff%22%20opacity=%22.95%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <style>
   :root {
@@ -115,7 +116,6 @@
 
   #toast { position: fixed; bottom: 36px; right: 14px; background: var(--fg); color: var(--bg); padding: 6px 12px; border-radius: 4px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #toast.show { opacity: .92; }
-  #menu-btn { display: none; }
   #linkbox { position: fixed; bottom: 64px; right: 14px; width: min(420px, calc(100vw - 28px)); font: inherit; padding: 6px 8px; color: var(--fg); background: var(--bg2); border: 1px solid var(--accent); border-radius: 4px; }
 
   @media (max-width: 800px) {
@@ -131,7 +131,7 @@
 </head>
 <body class="preview-on">
 <aside id="sidebar">
-  <header><strong>Notes</strong><button id="new" title="New note (Alt+N)">+ new</button></header>
+  <header><strong>Notes</strong><button id="new" title="New note (Alt+N)">+ new</button><button id="hide-sidebar" title="Hide sidebar (Alt+B)">« hide</button></header>
   <ul id="list"></ul>
   <footer>
     <button id="import" title="Import a .md file">import</button>
@@ -141,7 +141,7 @@
 </aside>
 <div id="main">
   <div id="bar">
-    <button id="menu-btn" title="Notes list">☰</button>
+    <button id="menu-btn" title="Show/hide sidebar (Alt+B)">☰</button>
     <input class="title" id="title" type="text" spellcheck="false" aria-label="Note name" title="Click to rename">
     <button id="toggle" title="Toggle preview (Alt+P)">preview</button>
     <button id="export" title="Download as .md">export .md</button>
@@ -156,7 +156,7 @@
     <span id="saved"></span>
     <span class="sp"></span>
     <span id="count"></span>
-    <span class="hide-narrow">Alt+N new · Alt+P preview · :w save</span>
+    <span class="hide-narrow">Alt+N new · Alt+P preview · Alt+B sidebar · :w save</span>
   </div>
 </div>
 <input id="linkbox" type="text" readonly hidden aria-label="Share link">
@@ -198,7 +198,7 @@ const [{ EditorState }, { EditorView, keymap, drawSelection }, { defaultKeymap, 
 const $ = (id) => document.getElementById(id);
 
 /* ---------- storage (every access guarded) ---------- */
-const KEY = "notes.v1", THEME_KEY = "notes.theme";
+const KEY = "notes.v1", THEME_KEY = "notes.theme", SIDEBAR_KEY = "notes.sidebar";
 const mem = {};
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return mem[k] ?? null; } },
@@ -421,13 +421,20 @@ $("theme").onclick = () => { const n = effTheme() === "dark" ? "light" : "dark";
 
 function setPreview(on) { document.body.classList.toggle("preview-on", on); if (on) updatePreview(); }
 $("toggle").onclick = () => setPreview(!document.body.classList.contains("preview-on"));
-$("menu-btn").onclick = () => document.body.classList.toggle("no-sidebar");
+function toggleSidebar() {
+  const hidden = document.body.classList.toggle("no-sidebar");
+  if (innerWidth > 800) store.set(SIDEBAR_KEY, hidden ? "hidden" : "shown");
+}
+$("menu-btn").onclick = toggleSidebar;
+$("hide-sidebar").onclick = toggleSidebar;
+if (innerWidth > 800 && store.get(SIDEBAR_KEY) === "hidden") document.body.classList.add("no-sidebar");
 if (innerWidth <= 800) { document.body.classList.add("no-sidebar"); setPreview(false); }
 
 addEventListener("keydown", (e) => {
   if (!e.altKey || e.ctrlKey || e.metaKey) return;
   if (e.code === "KeyN") { e.preventDefault(); newNote(); }
   else if (e.code === "KeyP") { e.preventDefault(); $("toggle").click(); }
+  else if (e.code === "KeyB") { e.preventDefault(); toggleSidebar(); }
 }, true);
 addEventListener("beforeunload", flushSave);
 addEventListener("hashchange", loadFromHash);
